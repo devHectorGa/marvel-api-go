@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,13 +13,31 @@ import (
 	"strings"
 	"time"
 )
+type searchByName struct {
+	Code int `json:"code"`
+	Data	struct{
+		Results	[]result `json:"results"`
+	}	`json:"data"`
+}
+type result struct {
+	Name	string `json:"name"`
+	Description	string	`json:"description"`
+	Comics	struct{ Items []items `json:"items"` } `json:"comics"`
+	Series struct{ Items []items `json:"items"`  } `json:"series"`
+	Stories struct { Items []items `json:"items"` } `json:"stories"`
+	Events struct{ Items []items `json:"items"` } `json:"events"`
 
+}
+type items struct{
+	NameItem	string	`json:"name"`
+}
 func main(){
 	menu :=
 `
-Bienvenido, ¿Qué prefieres?
-[ 1 ] Buscar por nombre
-[ 2 ] Listar	
+	Bienvenido, ¿Qué prefieres?
+	[ 1 ] Buscar por nombre
+	[ 2 ] Listar
+	[ 3 ] Salir
 `
 	fmt.Print(menu)
 
@@ -37,6 +56,8 @@ Bienvenido, ¿Qué prefieres?
 		buscarPorNombre(auth)
 	case "2":
 		listar(auth)
+	case "3":
+		break
 	default:
 		main()
 	}
@@ -53,27 +74,66 @@ func buscarPorNombre(auth string){
 		fmt.Printf(`Error: %s`, err)
 	}else {
 		data, _ := ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		fmt.Printf("%s", data)
+
+		var record searchByName
+
+		json.Unmarshal(data, &record)
+		printInDisplay(record)
 	}
 
 }
 func listar(auth string){
-	resp,err := http.Get("https://gateway.marvel.com/v1/public/characters?" + auth)
+	resp,err := http.Get("https://gateway.marvel.com/v1/public/characters?orderBy=name&limit=20&" + auth)
 	if err != nil {
 		fmt.Printf(`Error: %s`, err)
+	}else{
+		data, _ := ioutil.ReadAll(resp.Body)
+
+		var record searchByName
+
+		json.Unmarshal(data, &record)
+		printInDisplay(record)
 	}
-	data, _ := ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-
-	fmt.Printf("%s", data)
 }
-/*
-[ base url: https://gateway.marvel.com , api version: Cable ]
 
-BUSCAR POR NOMBRE
-/v1/public/characters/{characterId}
+func printInDisplay(record searchByName){
+	var comicSearch[]items = record.Data.Results[0].Comics.Items
+	var seriesSearch[]items = record.Data.Results[0].Series.Items
+	var storiesSearch[]items = record.Data.Results[0].Stories.Items
+	var eventsSearch[]items = record.Data.Results[0].Events.Items
+	if(len(record.Data.Results) == 1){
+		fmt.Println("El nombre del Heroe es: " +record.Data.Results[0].Name)
+		fmt.Println("Su descripcion: " +record.Data.Results[0].Description)
+		if(len(comicSearch) != 0){
+			println("Comics: ")
+			for i := 0; i < len(comicSearch); i++ {
+				println(" * " + comicSearch[i].NameItem)
+			}
+		}
+		if(len(seriesSearch) != 0){
+			println("Series: ")
+			for i := 0; i < len(seriesSearch); i++ {
+				println(" * " + seriesSearch[i].NameItem)
+			}
+		}
+		if(len(storiesSearch) != 0){
+			println("Stories: ")
+			for i := 0; i < len(storiesSearch); i++ {
+				println(" * " + storiesSearch[i].NameItem)
+			}
+		}
+		if(len(eventsSearch) != 0){
+			println("Events: ")
+			for i := 0; i < len(eventsSearch); i++ {
+				println(" * " + eventsSearch[i].NameItem)
+			}
+		}
+	}else{
+		fmt.Println("Lista de Heroes:")
 
-LISTAR
-/v1/public/characters
-*/
+		for i := 0; i < len(record.Data.Results); i++{
+			fmt.Println(" * " + record.Data.Results[i].Name)
+		}
+	}
+	main()
+}
